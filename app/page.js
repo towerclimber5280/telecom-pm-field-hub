@@ -1,114 +1,46 @@
-const crews = [
-  { name: "AUI HDD 01", area: "LI1.13", activity: "HDD / Conduit", status: "Active", production: "620 LF" },
-  { name: "AUI HDD 02", area: "LI1.12", activity: "HDD / Conduit", status: "Active", production: "540 LF" },
-  { name: "Fiber 01", area: "LI1.02", activity: "Fiber Placement", status: "Delayed", production: "410 LF" },
-  { name: "Restore 01", area: "LI1.13", activity: "Restoration", status: "Active", production: "9 locations" }
-];
+"use client";
+import { useEffect, useMemo, useState } from "react";
 
-const attention = [
-  { level: "Critical", item: "Utility conflict", location: "Span 351", owner: "CM", status: "Open" },
-  { level: "High", item: "Permit availability", location: "LI1.12", owner: "PM", status: "Monitoring" },
-  { level: "Medium", item: "Restoration overdue", location: "Span 340", owner: "Contractor", status: "Open" }
-];
-
-const risks = [
-  { id: "R-001", description: "Permit approval may delay planned work", probability: "Medium", impact: "High", response: "Mitigate", owner: "PM" },
-  { id: "R-002", description: "Utility congestion may reduce HDD production", probability: "High", impact: "High", response: "Mitigate", owner: "CM" }
-];
-
-const issues = [
-  { id: "I-001", description: "Unmarked utility discovered during potholing", priority: "Critical", owner: "CM", action: "Expose utility and verify revised bore path" },
-  { id: "I-002", description: "Restoration backlog exceeds planned turnaround", priority: "High", owner: "Contractor", action: "Add restoration resources" }
-];
-
-function Stat({ label, value, sub }) {
-  return <div className="card stat"><div className="label">{label}</div><div className="value">{value}</div><div className="sub">{sub}</div></div>;
+const seed = {
+  projects:[{id:1,name:"Lisle FTTH Demo",customer:"Ezee Fiber",contractor:"AUI",market:"Lisle, Illinois",type:"FTTH / OSP",start:"2026-09-15",target:"2026-11-30",planned:25000,status:"Active"}],
+  production:[
+    {id:1,date:"2026-10-01",crew:"AUI HDD 01",area:"LI1.13",span:"485",activity:"HDD / Conduit",qty:620,unit:"LF",status:"Complete",notes:"Bore completed; conduit installed."},
+    {id:2,date:"2026-10-01",crew:"AUI HDD 02",area:"LI1.12",span:"604",activity:"HDD / Conduit",qty:540,unit:"LF",status:"Active",notes:"Utility exposure complete."},
+    {id:3,date:"2026-10-01",crew:"Fiber 01",area:"LI1.02",span:"130",activity:"Fiber Placement",qty:410,unit:"LF",status:"Delayed",notes:"Waiting on access."}
+  ],
+  issues:[{id:1,title:"Unmarked utility discovered during potholing",area:"LI1.13",span:"351",priority:"Critical",owner:"CM",status:"Open",action:"Expose utility and verify revised bore path"}],
+  risks:[{id:1,title:"Permit approval may delay planned work",area:"LI1.12",probability:"Medium",impact:"High",owner:"PM",status:"Open",response:"Mitigate"}],
+  qc:[{id:1,title:"Verify conduit depth",area:"LI1.13",span:"485",owner:"CI",status:"Awaiting Verification",notes:"Confirm as-built depth before closeout."}]
+};
+const tabs=["Dashboard","Projects","Production","Issues","Risks","QC","Daily Report"];
+const emptyForms={project:{name:"",customer:"",contractor:"",market:"",type:"FTTH / OSP",start:"",target:"",planned:"",status:"Active"},production:{date:new Date().toISOString().slice(0,10),crew:"",area:"",span:"",activity:"HDD / Conduit",qty:"",unit:"LF",status:"Active",notes:""},issue:{title:"",area:"",span:"",priority:"High",owner:"CM",status:"Open",action:""},risk:{title:"",area:"",probability:"Medium",impact:"High",owner:"PM",status:"Open",response:"Mitigate"},qc:{title:"",area:"",span:"",owner:"CI",status:"Open",notes:""}};
+function Card({label,value,sub,onClick}){return <button className="stat card" onClick={onClick}><span className="label">{label}</span><span className="value">{value}</span><span className="sub">{sub}</span></button>}
+function Field({label,name,value,onChange,type="text",options}){return <label className="field"><span>{label}</span>{options?<select name={name} value={value} onChange={onChange}>{options.map(x=><option key={x}>{x}</option>)}</select>:<input type={type} name={name} value={value} onChange={onChange}/>}</label>}
+function Modal({title,children,onClose}){return <div className="shade" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modalHead"><h2>{title}</h2><button className="ghost" onClick={onClose}>✕</button></div>{children}</div></div>}
+export default function Home(){
+ const [data,setData]=useState(seed),[tab,setTab]=useState("Dashboard"),[modal,setModal]=useState(null),[form,setForm]=useState(emptyForms.production),[loaded,setLoaded]=useState(false);
+ useEffect(()=>{try{const x=localStorage.getItem("telecomPMv02");if(x)setData(JSON.parse(x))}catch{}setLoaded(true)},[]);
+ useEffect(()=>{if(loaded)localStorage.setItem("telecomPMv02",JSON.stringify(data))},[data,loaded]);
+ const today=new Date().toISOString().slice(0,10), prodToday=data.production.filter(x=>x.date===today), total=prodToday.reduce((s,x)=>s+(Number(x.qty)||0),0), target=1800;
+ const openIssues=data.issues.filter(x=>x.status!=="Closed"),openRisks=data.risks.filter(x=>x.status!=="Closed"),openQc=data.qc.filter(x=>x.status!=="Closed"&&x.status!=="Verified");
+ const open=(kind)=>{setForm({...emptyForms[kind]});setModal(kind)};
+ const change=e=>setForm({...form,[e.target.name]:e.target.value});
+ const save=e=>{e.preventDefault();const map={project:"projects",production:"production",issue:"issues",risk:"risks",qc:"qc"},key=map[modal];setData({...data,[key]:[...data[key],{...form,id:Date.now(),qty:modal==="production"?Number(form.qty):form.qty,planned:modal==="project"?Number(form.planned):form.planned}]});setModal(null)};
+ const remove=(key,id)=>setData({...data,[key]:data[key].filter(x=>x.id!==id)});
+ const report=useMemo(()=>`DAILY TELECOM CONSTRUCTION REPORT\nDate: ${today}\n\nProduction: ${total.toLocaleString()} LF/units recorded across ${prodToday.length} entries.\nOpen Issues: ${openIssues.length}\nOpen Risks: ${openRisks.length}\nOpen QC Items: ${openQc.length}\n\nFIELD PRODUCTION\n${prodToday.map(x=>`• ${x.crew} | ${x.area}${x.span?` / Span ${x.span}`:""} | ${x.activity} | ${x.qty} ${x.unit} | ${x.status}${x.notes?` | ${x.notes}`:""}`).join("\n")||"No production entered today."}\n\nISSUES\n${openIssues.map(x=>`• ${x.priority}: ${x.title} | ${x.area} ${x.span||""} | Owner: ${x.owner} | ${x.action}`).join("\n")||"None open."}\n\nRISKS\n${openRisks.map(x=>`• ${x.title} | P:${x.probability} I:${x.impact} | Owner: ${x.owner} | Response: ${x.response}`).join("\n")||"None open."}\n\nQC / PUNCH\n${openQc.map(x=>`• ${x.title} | ${x.area} ${x.span||""} | ${x.status} | Owner: ${x.owner}`).join("\n")||"None open."}`, [data,total,today]);
+ const copy=async()=>{await navigator.clipboard.writeText(report);alert("Daily report copied to clipboard.")};
+ const reset=()=>{if(confirm("Reset all demo data?")){setData(seed);localStorage.removeItem("telecomPMv02")}};
+ return <main><header><div><div className="eyebrow">TELECOM CONSTRUCTION PROJECT MANAGEMENT</div><h1>Telecom PM Field Hub</h1><p>Field-first FTTH / OSP project management • Prototype v0.2</p></div><div className="badge">FTTH / OSP</div></header>
+ <nav>{tabs.map(x=><button key={x} className={tab===x?"active":""} onClick={()=>setTab(x)}>{x}</button>)}</nav>
+ {tab==="Dashboard"&&<><section className="grid stats"><Card label="Production Today" value={`${total.toLocaleString()} LF`} sub={`${Math.round(total/target*100)}% of ${target.toLocaleString()} LF target`} onClick={()=>setTab("Production")}/><Card label="Active Projects" value={data.projects.filter(x=>x.status==="Active").length} sub="Tap to manage" onClick={()=>setTab("Projects")}/><Card label="Open Issues" value={openIssues.length} sub={`${openIssues.filter(x=>x.priority==="Critical").length} critical`} onClick={()=>setTab("Issues")}/><Card label="Open Risks" value={openRisks.length} sub={`${openRisks.filter(x=>x.impact==="High").length} high impact`} onClick={()=>setTab("Risks")}/><Card label="QC Items" value={openQc.length} sub={`${openQc.filter(x=>x.status==="Awaiting Verification").length} awaiting verification`} onClick={()=>setTab("QC")}/></section><section className="two"><div className="panel"><div className="panelHead"><h2>Today's Field Production</h2><button onClick={()=>open("production")}>+ Entry</button></div>{prodToday.map(x=><div className="row" key={x.id}><div><b>{x.crew}</b><small>{x.area} {x.span&&`• Span ${x.span}`} • {x.activity}</small></div><strong>{x.qty} {x.unit}</strong></div>)}{!prodToday.length&&<p className="muted">No production entered today.</p>}</div><div className="panel"><div className="panelHead"><h2>PM Health</h2><span>Live from entries</span></div><div className="health"><p><b>Production</b><span className={total>=target?"good":"warn"}>{Math.round(total/target*100)}% target</span></p><p><b>Issues</b><span className={openIssues.some(x=>x.priority==="Critical")?"bad":"good"}>{openIssues.length} open</span></p><p><b>Risk</b><span className={openRisks.some(x=>x.impact==="High")?"warn":"good"}>{openRisks.length} open</span></p><p><b>Quality</b><span className={openQc.length?"warn":"good"}>{openQc.length} open</span></p></div></div></section></>}
+ {tab==="Projects"&&<List title="Projects" add={()=>open("project")} headers={["Project","Customer / Contractor","Market","Type","Status"]} rows={data.projects.map(x=>[x.name,`${x.customer} / ${x.contractor}`,x.market,x.type,x.status])} items={data.projects} del={id=>remove("projects",id)}/>} 
+ {tab==="Production"&&<List title="Daily Production" add={()=>open("production")} headers={["Date","Crew","Area / Span","Activity","Production","Status"]} rows={data.production.map(x=>[x.date,x.crew,`${x.area}${x.span?` / ${x.span}`:""}`,x.activity,`${x.qty} ${x.unit}`,x.status])} items={data.production} del={id=>remove("production",id)}/>} 
+ {tab==="Issues"&&<List title="Issue Log" add={()=>open("issue")} headers={["Issue","Area / Span","Priority","Owner","Status","Action"]} rows={data.issues.map(x=>[x.title,`${x.area} ${x.span||""}`,x.priority,x.owner,x.status,x.action])} items={data.issues} del={id=>remove("issues",id)}/>} 
+ {tab==="Risks"&&<List title="Risk Register" add={()=>open("risk")} headers={["Risk","Area","Probability","Impact","Owner","Response"]} rows={data.risks.map(x=>[x.title,x.area,x.probability,x.impact,x.owner,x.response])} items={data.risks} del={id=>remove("risks",id)}/>} 
+ {tab==="QC"&&<List title="QC / Punch List" add={()=>open("qc")} headers={["Item","Area / Span","Owner","Status","Notes"]} rows={data.qc.map(x=>[x.title,`${x.area} ${x.span||""}`,x.owner,x.status,x.notes])} items={data.qc} del={id=>remove("qc",id)}/>} 
+ {tab==="Daily Report"&&<section className="panel report"><div className="panelHead"><h2>Daily PM Report</h2><button onClick={copy}>Copy Report</button></div><pre>{report}</pre></section>}
+ <footer>Telecom PM Field Hub • v0.2 • Data is stored locally on this device <button className="link" onClick={reset}>Reset demo data</button></footer>
+ {modal&&<Modal title={`Add ${modal[0].toUpperCase()+modal.slice(1)}`} onClose={()=>setModal(null)}><EntryForm kind={modal} form={form} change={change} save={save}/></Modal>}</main>
 }
-
-export default function Home() {
-  return (
-    <main>
-      <header>
-        <div>
-          <div className="eyebrow">TELECOM CONSTRUCTION PROJECT MANAGEMENT</div>
-          <h1>Telecom PM Field Hub</h1>
-          <p>FTTH Demo Project • Lisle, Illinois • Portfolio Prototype v0.1</p>
-        </div>
-        <div className="badge">FTTH / OSP</div>
-      </header>
-
-      <section className="notice">
-        Demo data only. Designed for telecom construction managers and project managers.
-      </section>
-
-      <section className="grid stats">
-        <Stat label="Overall Progress" value="68%" sub="Construction complete" />
-        <Stat label="Schedule" value="Behind" sub="2 critical constraints" />
-        <Stat label="Active Crews" value="4" sub="3 production • 1 restoration" />
-        <Stat label="Open Issues" value="4" sub="1 critical" />
-        <Stat label="Open Risks" value="3" sub="2 high exposure" />
-        <Stat label="QC Items" value="6" sub="2 awaiting verification" />
-      </section>
-
-      <section className="two">
-        <div className="panel">
-          <div className="panelHead"><h2>Production</h2><span>Today</span></div>
-          <div className="production">
-            <div><strong>1,570 LF</strong><small>Conduit / fiber production</small></div>
-            <div><strong>1,800 LF</strong><small>Daily target</small></div>
-            <div><strong>87%</strong><small>Target achieved</small></div>
-          </div>
-          <div className="bar"><div style={{width:"87%"}}></div></div>
-        </div>
-
-        <div className="panel">
-          <div className="panelHead"><h2>PM Health</h2><span>Current</span></div>
-          <div className="health">
-            <p><b>Safety</b><span className="good">No incidents</span></p>
-            <p><b>Quality</b><span className="warn">6 open items</span></p>
-            <p><b>Schedule</b><span className="bad">Behind plan</span></p>
-            <p><b>Stakeholders</b><span className="good">Engaged</span></p>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panelHead"><h2>Crew & Field Production</h2><span>Daily field view</span></div>
-        <div className="tableWrap"><table>
-          <thead><tr><th>Crew</th><th>Area</th><th>Activity</th><th>Status</th><th>Production</th></tr></thead>
-          <tbody>{crews.map((c,i)=><tr key={i}><td>{c.name}</td><td>{c.area}</td><td>{c.activity}</td><td><span className={"pill "+(c.status==="Active"?"pGood":"pWarn")}>{c.status}</span></td><td>{c.production}</td></tr>)}</tbody>
-        </table></div>
-      </section>
-
-      <section className="two">
-        <div className="panel">
-          <div className="panelHead"><h2>Attention Required</h2><span>Risks / issues / constraints</span></div>
-          {attention.map((a,i)=><div className="attention" key={i}>
-            <span className={"dot "+a.level.toLowerCase()}></span>
-            <div><b>{a.item}</b><small>{a.location} • Owner: {a.owner}</small></div>
-            <span className="muted">{a.status}</span>
-          </div>)}
-        </div>
-
-        <div className="panel">
-          <div className="panelHead"><h2>Daily PM Brief</h2><span>Auto-summary preview</span></div>
-          <p className="brief">Four crews are active across three FTTH work areas. Daily production is at 87% of target. Utility congestion remains the primary schedule constraint. One critical field issue requires bore-path verification. Six QC items remain open, with two awaiting verification. No safety incidents reported.</p>
-          <button>Generate Daily Report</button>
-        </div>
-      </section>
-
-      <section className="two">
-        <div className="panel">
-          <div className="panelHead"><h2>Risk Register</h2><span>Future uncertainty</span></div>
-          {risks.map(r=><div className="register" key={r.id}><b>{r.id}</b><div><strong>{r.description}</strong><small>{r.probability} probability • {r.impact} impact • {r.response} • Owner: {r.owner}</small></div></div>)}
-        </div>
-        <div className="panel">
-          <div className="panelHead"><h2>Issue Log</h2><span>Known problems</span></div>
-          {issues.map(r=><div className="register" key={r.id}><b>{r.id}</b><div><strong>{r.description}</strong><small>{r.priority} • Owner: {r.owner} • {r.action}</small></div></div>)}
-        </div>
-      </section>
-
-      <footer>Telecom PM Field Hub • Prototype v0.1 • Demo data</footer>
-    </main>
-  );
-}
+function List({title,add,headers,rows,items,del}){return <section className="panel list"><div className="panelHead"><h2>{title}</h2><button onClick={add}>+ Add</button></div><div className="tableWrap"><table><thead><tr>{headers.map(h=><th key={h}>{h}</th>)}<th></th></tr></thead><tbody>{rows.map((r,i)=><tr key={items[i].id}>{r.map((v,j)=><td key={j}>{v||"—"}</td>)}<td><button className="danger ghost" onClick={()=>del(items[i].id)}>Delete</button></td></tr>)}</tbody></table></div>{!rows.length&&<p className="muted">Nothing here yet. Humanity has briefly achieved zero backlog.</p>}</section>}
+function EntryForm({kind,form,change,save}){return <form onSubmit={save} className="form">{kind==="project"&&<><Field label="Project name" name="name" value={form.name} onChange={change}/><Field label="Customer" name="customer" value={form.customer} onChange={change}/><Field label="GC / Contractor" name="contractor" value={form.contractor} onChange={change}/><Field label="Market / Location" name="market" value={form.market} onChange={change}/><Field label="Type" name="type" value={form.type} onChange={change} options={["FTTH / OSP","Wireless","Fiber Backbone","Other"]}/><Field label="Start" name="start" type="date" value={form.start} onChange={change}/><Field label="Target completion" name="target" type="date" value={form.target} onChange={change}/><Field label="Planned footage" name="planned" type="number" value={form.planned} onChange={change}/></>}{kind==="production"&&<><Field label="Date" name="date" type="date" value={form.date} onChange={change}/><Field label="Crew" name="crew" value={form.crew} onChange={change}/><Field label="Area" name="area" value={form.area} onChange={change}/><Field label="Span" name="span" value={form.span} onChange={change}/><Field label="Activity" name="activity" value={form.activity} onChange={change} options={["HDD / Conduit","Fiber Placement","Potholing","Handhole / Vault","Splicing","Restoration","QC / As-Built"]}/><Field label="Production quantity" name="qty" type="number" value={form.qty} onChange={change}/><Field label="Unit" name="unit" value={form.unit} onChange={change} options={["LF","EA","Locations","HH","Vaults"]}/><Field label="Status" name="status" value={form.status} onChange={change} options={["Active","Complete","Delayed","Blocked"]}/><Field label="Notes" name="notes" value={form.notes} onChange={change}/></>}{kind==="issue"&&<><Field label="Issue" name="title" value={form.title} onChange={change}/><Field label="Area" name="area" value={form.area} onChange={change}/><Field label="Span" name="span" value={form.span} onChange={change}/><Field label="Priority" name="priority" value={form.priority} onChange={change} options={["Critical","High","Medium","Low"]}/><Field label="Owner" name="owner" value={form.owner} onChange={change}/><Field label="Action" name="action" value={form.action} onChange={change}/></>}{kind==="risk"&&<><Field label="Risk" name="title" value={form.title} onChange={change}/><Field label="Area" name="area" value={form.area} onChange={change}/><Field label="Probability" name="probability" value={form.probability} onChange={change} options={["High","Medium","Low"]}/><Field label="Impact" name="impact" value={form.impact} onChange={change} options={["High","Medium","Low"]}/><Field label="Owner" name="owner" value={form.owner} onChange={change}/><Field label="Response" name="response" value={form.response} onChange={change} options={["Mitigate","Avoid","Transfer","Accept","Escalate"]}/></>}{kind==="qc"&&<><Field label="QC / Punch item" name="title" value={form.title} onChange={change}/><Field label="Area" name="area" value={form.area} onChange={change}/><Field label="Span" name="span" value={form.span} onChange={change}/><Field label="Owner" name="owner" value={form.owner} onChange={change}/><Field label="Status" name="status" value={form.status} onChange={change} options={["Open","Awaiting Verification","Verified","Closed"]}/><Field label="Notes" name="notes" value={form.notes} onChange={change}/></>}<button className="save" type="submit">Save Entry</button></form>}
