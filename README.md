@@ -1,32 +1,15 @@
-# Telecom PM Field Hub
+# Telecom PM Field Hub v0.3
 
-A telecom-oriented construction project management portfolio application for FTTH/OSP and wireless construction.
+A mobile-friendly telecom construction project management portfolio app for FTTH/OSP and wireless construction.
 
-## Version 0.1
-This first prototype demonstrates:
-- Project health dashboard
-- Daily production tracking
-- Crew status
-- Risk register
-- Issue log
-- QC visibility
-- Daily PM brief
-- Mobile-responsive layout
+## v0.3
+- Starts empty: demo data no longer repopulates itself.
+- Optional sample data under Settings.
+- Add, edit, and delete Projects, Production, Issues, Risks, and QC items.
+- Issue and risk status can be updated/closed.
+- Dashboard metrics calculate from current records.
+- Configurable daily production target.
+- Daily PM report generated from current records and copyable to clipboard.
+- Browser localStorage persistence using a new v0.3 storage key.
 
-All included project information is fictional demo data.
-
-## Run locally
-1. Install Node.js 18+.
-2. Open a terminal in this folder.
-3. Run `npm install`.
-4. Run `npm run dev`.
-5. Open http://localhost:3000.
-
-## Planned roadmap
-- v0.2: editable projects and daily production forms
-- v0.3: Supabase database and authentication
-- v0.4: QC/punch-list workflow and photo records
-- v0.5: change log, milestones, schedule and EVM
-- v0.6: FTTH / Wireless project modes
-- v0.7: PDF daily reports
-- v1.0: deployable portfolio release
+Data remains local to the current browser/device. Cloud accounts and shared storage are not included yet.
